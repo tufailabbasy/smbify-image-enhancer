@@ -415,11 +415,51 @@
                   <option value="manual">Specific Date/Time...</option>
                 </select>
               </div>
-
               <!-- Manual Date input -->
               <div id="custom-date-input" class="control-group hidden">
                 <label for="input-creation-date">Choose Date &amp; Time</label>
                 <input type="datetime-local" id="input-creation-date" class="form-control">
+              </div>
+
+              <!-- SEO Image Tags (Title, Description, Keywords, Author, Copyright) -->
+              <div class="control-group border-top pt-3 mt-3">
+                <label style="font-weight: 600; color: var(--text-primary); font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; display: block; margin-bottom: 5px;">SEO &amp; Brand Metadata</label>
+              </div>
+
+              <!-- Title -->
+              <div class="control-group">
+                <label for="input-seo-title">Image Title (XPTitle)</label>
+                <input type="text" id="input-seo-title" class="form-control" placeholder="e.g. Dallas Roof Repair">
+              </div>
+
+              <!-- Subject -->
+              <div class="control-group">
+                <label for="input-seo-subject">Subject (XPSubject)</label>
+                <input type="text" id="input-seo-subject" class="form-control" placeholder="e.g. Dumpster Rental Service">
+              </div>
+
+              <!-- Keywords -->
+              <div class="control-group">
+                <label for="input-seo-keywords">Keywords / Tags (XPKeywords)</label>
+                <input type="text" id="input-seo-keywords" class="form-control" placeholder="e.g. roof, repair, dallas (comma separated)">
+              </div>
+
+              <!-- Description -->
+              <div class="control-group">
+                <label for="input-seo-description">Description / Comment</label>
+                <textarea id="input-seo-description" class="form-control" placeholder="e.g. Professional dumpster rental service in downtown Dallas..." rows="2" style="font-family: inherit; resize: vertical; min-height: 50px;"></textarea>
+              </div>
+
+              <!-- Author / Artist -->
+              <div class="control-group">
+                <label for="input-seo-author">Author / Artist (Artist)</label>
+                <input type="text" id="input-seo-author" class="form-control" placeholder="e.g. Dapper Dumpsters Inc.">
+              </div>
+
+              <!-- Copyright -->
+              <div class="control-group">
+                <label for="input-seo-copyright">Copyright</label>
+                <input type="text" id="input-seo-copyright" class="form-control" placeholder="e.g. © 2026 Dapper Dumpsters. All rights reserved.">
               </div>
 
             </div>

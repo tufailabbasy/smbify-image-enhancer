@@ -1386,6 +1386,48 @@ function generateEXIFBytes() {
   zeroth[piexif.ImageIFD.YResolution] = [72, 1];
   zeroth[piexif.ImageIFD.ResolutionUnit] = 2;
 
+  // Read SEO and Brand inputs
+  const titleVal = document.getElementById('input-seo-title').value.trim();
+  const subjectVal = document.getElementById('input-seo-subject').value.trim();
+  const keywordsVal = document.getElementById('input-seo-keywords').value.trim();
+  const descriptionVal = document.getElementById('input-seo-description').value.trim();
+  const authorVal = document.getElementById('input-seo-author').value.trim();
+  const copyrightVal = document.getElementById('input-seo-copyright').value.trim();
+
+  // Helper to encode string to UTF-16LE byte array for Windows-specific tags (XPTitle, XPKeywords, etc.)
+  const toUtf16le = (str) => {
+    const bytes = [];
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      bytes.push(code & 0xff);
+      bytes.push((code >> 8) & 0xff);
+    }
+    bytes.push(0, 0); // null terminator
+    return bytes;
+  };
+
+  if (titleVal) {
+    zeroth[40091] = toUtf16le(titleVal); // XPTitle
+  }
+  if (subjectVal) {
+    zeroth[40095] = toUtf16le(subjectVal); // XPSubject
+  }
+  if (keywordsVal) {
+    zeroth[40094] = toUtf16le(keywordsVal); // XPKeywords
+  }
+  if (descriptionVal) {
+    zeroth[270] = descriptionVal; // ImageDescription (Standard ASCII)
+    zeroth[40092] = toUtf16le(descriptionVal); // XPComment
+  }
+  if (authorVal) {
+    zeroth[315] = authorVal; // Artist / Author (Standard ASCII)
+    zeroth[40093] = toUtf16le(authorVal); // XPAuthor
+  }
+  if (copyrightVal) {
+    zeroth[33432] = copyrightVal; // Copyright (Standard ASCII)
+  }
+
+
   const exif = {};
   exif[piexif.ExifIFD.DateTimeOriginal] = exifDateStr;
   exif[piexif.ExifIFD.DateTimeDigitized] = exifDateStr;
