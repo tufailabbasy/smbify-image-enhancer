@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMBify | Bulk Image Enhancer & EXIF Anonymizer</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- JS Libraries from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.js"></script>
+</head>
+<body>
+  <!-- Ambient background elements -->
+  <div class="glow-bg">
+    <div class="blob blob-purple"></div>
+    <div class="blob blob-blue"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <i class="fa-solid fa-wand-magic-sparkles logo-icon"></i>
+        <h1>SMBify</h1>
+        <span class="logo-sub">Enhance &amp; Anonymize</span>
+      </div>
+      
+      <!-- Mode Switcher -->
+      <div class="mode-tabs">
+        <button id="btn-single-mode" class="mode-tab active">
+          <i class="fa-solid fa-image"></i> Single Editor
+        </button>
+        <button id="btn-bulk-mode" class="mode-tab">
+          <i class="fa-solid fa-images"></i> Bulk Processing
+        </button>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="quick-actions">
+        <button id="btn-undo" class="action-btn" title="Undo (Ctrl+Z)" disabled>
+          <i class="fa-solid fa-arrow-rotate-left"></i>
+        </button>
+        <button id="btn-redo" class="action-btn" title="Redo (Ctrl+Y)" disabled>
+          <i class="fa-solid fa-arrow-rotate-right"></i>
+        </button>
+        <button id="btn-reset" class="action-btn text-btn">
+          <i class="fa-solid fa-trash-can"></i> Reset All
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <main class="app-body">
+      
+      <!-- Workspace area (left panel) -->
+      <section class="workspace-panel">
+        
+        <!-- SINGLE MODE VIEWPORT -->
+        <div id="single-viewport" class="viewport active">
+          <div class="canvas-wrapper">
+            <!-- Upload Prompt -->
+            <div id="single-upload-prompt" class="upload-zone">
+              <i class="fa-solid fa-cloud-arrow-up upload-icon"></i>
+              <h3>Upload an image to enhance</h3>
+              <p>Drag and drop or click to browse</p>
+              <button class="btn btn-secondary upload-trigger-btn">Select File</button>
+            </div>
+            
+            <!-- Canvas container -->
+            <div id="image-container" class="image-container hidden">
+              <div id="cropper-box" class="cropper-box hidden">
+                <div class="cropper-handle tl"></div>
+                <div class="cropper-handle tr"></div>
+                <div class="cropper-handle bl"></div>
+                <div class="cropper-handle br"></div>
+                <div class="cropper-grid">
+                  <div class="grid-line-h h1"></div>
+                  <div class="grid-line-h h2"></div>
+                  <div class="grid-line-v v1"></div>
+                  <div class="grid-line-v v2"></div>
+                </div>
+              </div>
+              <img id="preview-image" alt="Preview">
+              <canvas id="main-canvas" class="hidden"></canvas>
+            </div>
+          </div>
+          
+          <!-- Single Mode Toolbar -->
+          <div id="single-toolbar" class="workspace-toolbar hidden">
+            <button id="btn-crop-toggle" class="toolbar-btn">
+              <i class="fa-solid fa-crop-simple"></i> Crop
+            </button>
+            <button id="btn-crop-apply" class="toolbar-btn hidden" style="background: var(--accent-gradient); color: #ffffff; border: none; box-shadow: 0 2px 4px rgba(15,23,42,0.15);">
+              <i class="fa-solid fa-check"></i> Apply Crop
+            </button>
+            <button id="btn-rotate-ccw" class="toolbar-btn">
+              <i class="fa-solid fa-rotate-left"></i> Rotate Left
+            </button>
+            <button id="btn-rotate-cw" class="toolbar-btn">
+              <i class="fa-solid fa-rotate-right"></i> Rotate Right
+            </button>
+            <button id="btn-flip-h" class="toolbar-btn">
+              <i class="fa-solid fa-arrows-left-right"></i> Flip Horiz
+            </button>
+            <button id="btn-flip-v" class="toolbar-btn">
+              <i class="fa-solid fa-arrows-up-down"></i> Flip Vert
+            </button>
+            <div class="zoom-controls">
+              <button id="btn-zoom-out" class="zoom-btn"><i class="fa-solid fa-minus"></i></button>
+              <span id="zoom-level">100%</span>
+              <button id="btn-zoom-in" class="zoom-btn"><i class="fa-solid fa-plus"></i></button>
+              <button id="btn-zoom-fit" class="zoom-btn" title="Fit to Viewport"><i class="fa-solid fa-expand"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- BULK MODE VIEWPORT -->
+        <div id="bulk-viewport" class="viewport">
+          <div id="bulk-upload-zone" class="upload-zone bulk-dropzone">
+            <i class="fa-solid fa-images upload-icon"></i>
+            <h3>Drag &amp; Drop multiple files or folders here</h3>
+            <p>PNG, JPEG, WebP files are supported</p>
+            <button class="btn btn-secondary upload-trigger-btn">Select Multiple Files</button>
+          </div>
+          
+          <!-- Bulk Image List Grid -->
+          <div id="bulk-queue-container" class="bulk-queue-container hidden">
+            <div class="queue-header">
+              <h3>Image Queue (<span id="bulk-queue-count">0</span> files loaded)</h3>
+              <button id="btn-clear-queue" class="btn-clear"><i class="fa-solid fa-circle-xmark"></i> Clear Queue</button>
+            </div>
+            <div id="bulk-image-grid" class="bulk-image-grid">
+              <!-- Dynamically populated card thumbnails -->
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Hidden file inputs -->
+      <input type="file" id="file-input-single" accept="image/*" class="hidden">
+      <input type="file" id="file-input-bulk" accept="image/*" multiple class="hidden">
+
+      <!-- Settings panel (right panel) -->
+      <aside class="settings-panel">
+        
+        <!-- SECTION 1: VISUAL ENHANCEMENTS -->
+        <div class="settings-card collapsed-header" data-section="enhancements">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-sliders slider-icon"></i> Enhancements</h3>
+            <i class="fa-solid fa-chevron-down toggle-icon"></i>
+          </div>
+          <div class="card-content">
+            <!-- Preset Filters -->
+            <div class="control-group border-bottom pb-3 mb-3">
+              <label>Quick Preset Filters</label>
+              <div class="preset-filters-grid">
+                <button class="preset-filter-btn active" data-preset="none"><i class="fa-solid fa-ban"></i> Reset</button>
+                <button class="preset-filter-btn" data-preset="auto"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto Boost</button>
+                <button class="preset-filter-btn" data-preset="cyberpunk"><i class="fa-solid fa-bolt"></i> Cyberpunk</button>
+                <button class="preset-filter-btn" data-preset="vintage"><i class="fa-solid fa-camera-retro"></i> Retro Film</button>
+                <button class="preset-filter-btn" data-preset="noir"><i class="fa-solid fa-circle-half-stroke"></i> Noir B&amp;W</button>
+                <button class="preset-filter-btn" data-preset="vibrant"><i class="fa-solid fa-fire"></i> Vibrant Pop</button>
+                <button class="preset-filter-btn" data-preset="matte"><i class="fa-solid fa-ghost"></i> Soft Matte</button>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Brightness</span>
+                <span id="val-brightness">100%</span>
+              </div>
+              <input type="range" id="slider-brightness" min="0" max="200" value="100">
+            </div>
+            
+            <div class="control-group">
+              <div class="control-label">
+                <span>Contrast</span>
+                <span id="val-contrast">100%</span>
+              </div>
+              <input type="range" id="slider-contrast" min="0" max="200" value="100">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Saturation</span>
+                <span id="val-saturation">100%</span>
+              </div>
+              <input type="range" id="slider-saturation" min="0" max="200" value="100">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Exposure (Gamma)</span>
+                <span id="val-exposure">100%</span>
+              </div>
+              <input type="range" id="slider-exposure" min="50" max="150" value="100">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Sharpness</span>
+                <span id="val-sharpness">0px</span>
+              </div>
+              <input type="range" id="slider-sharpness" min="0" max="100" value="0">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Blur</span>
+                <span id="val-blur">0px</span>
+              </div>
+              <input type="range" id="slider-blur" min="0" max="20" value="0">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Sepia</span>
+                <span id="val-sepia">0%</span>
+              </div>
+              <input type="range" id="slider-sepia" min="0" max="100" value="0">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Grayscale</span>
+                <span id="val-grayscale">0%</span>
+              </div>
+              <input type="range" id="slider-grayscale" min="0" max="100" value="0">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Hue-Rotate</span>
+                <span id="val-hue-rotate">0°</span>
+              </div>
+              <input type="range" id="slider-hue-rotate" min="0" max="360" value="0">
+            </div>
+
+            <div class="control-group">
+              <div class="control-label">
+                <span>Invert Colors</span>
+                <span id="val-invert">0%</span>
+              </div>
+              <input type="range" id="slider-invert" min="0" max="100" value="0">
+            </div>
+            
+            <button id="btn-reset-filters" class="btn btn-tertiary">
+              <i class="fa-solid fa-rotate"></i> Reset sliders
+            </button>
+          </div>
+        </div>
+
+        <!-- SECTION 2: TRANSFORMS & RESIZING -->
+        <div class="settings-card collapsed-header" data-section="sizing">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-maximize slider-icon"></i> Sizing &amp; Presets</h3>
+            <i class="fa-solid fa-chevron-down toggle-icon"></i>
+          </div>
+          <div class="card-content">
+            <div class="control-group">
+              <label for="select-resize-mode">Resize Mode</label>
+              <select id="select-resize-mode" class="form-control">
+                <option value="original">Keep Original Dimensions</option>
+                <option value="custom">Custom Width / Height</option>
+                <option value="width">Force Width (Fit Height)</option>
+                <option value="height">Force Height (Fit Width)</option>
+                <option value="limit">Limit Max Dimension (e.g. max 2048px)</option>
+              </select>
+            </div>
+
+            <!-- Custom Sizing Inputs (visible conditionally) -->
+            <div id="custom-size-inputs" class="size-inputs-row hidden">
+              <div class="form-input-col">
+                <label for="input-width">Width (px)</label>
+                <input type="number" id="input-width" class="form-control" placeholder="Width" min="10">
+              </div>
+              <div class="form-input-col">
+                <label for="input-height">Height (px)</label>
+                <input type="number" id="input-height" class="form-control" placeholder="Height" min="10">
+              </div>
+            </div>
+            <div id="size-lock-checkbox" class="checkbox-row hidden">
+              <input type="checkbox" id="chk-aspect-ratio" checked>
+              <label for="chk-aspect-ratio">Lock Aspect Ratio</label>
+            </div>
+
+            <!-- Limit sizing input -->
+            <div id="limit-size-input" class="control-group hidden">
+              <label for="input-max-dimension">Max Width/Height (px)</label>
+              <input type="number" id="input-max-dimension" class="form-control" value="2048" min="100">
+            </div>
+
+            <!-- Crop aspect presets for Single Editor -->
+            <div id="crop-presets-container" class="crop-presets">
+              <span class="group-label">Crop Aspect Ratio</span>
+              <div class="preset-grid">
+                <button class="preset-btn active" data-ratio="free">Free</button>
+                <button class="preset-btn" data-ratio="1:1">1:1 Square</button>
+                <button class="preset-btn" data-ratio="16:9">16:9 Widescreen</button>
+                <button class="preset-btn" data-ratio="4:3">4:3 Standard</button>
+                <button class="preset-btn" data-ratio="3:2">3:2 Classic</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 3: DIGITAL FOOTPRINTS & EXIF -->
+        <div class="settings-card collapsed-header" data-section="exif">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-fingerprint slider-icon"></i> EXIF &amp; Digital Footprint</h3>
+            <i class="fa-solid fa-chevron-down toggle-icon"></i>
+          </div>
+          <div class="card-content">
+            <!-- Anonymize toggle -->
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-title">Clean Digital Footprints</span>
+                <p class="toggle-desc">Strips all original tracking IDs, camera model tags, and GPS coordinates.</p>
+              </div>
+              <div class="toggle-switch">
+                <input type="checkbox" id="chk-strip-exif" checked disabled>
+                <label for="chk-strip-exif" class="slider-toggle-btn disabled-btn"></label>
+              </div>
+            </div>
+
+            <!-- Spoofing toggle -->
+            <div class="toggle-row mt-3 border-top pt-3">
+              <div>
+                <span class="toggle-title">Inject Fake EXIF Metadata</span>
+                <p class="toggle-desc">Replace stripped tags with fake, authentic US camera metadata so photos don't look artificial to Google.</p>
+              </div>
+              <div class="toggle-switch">
+                <input type="checkbox" id="chk-inject-exif">
+                <label for="chk-inject-exif" class="slider-toggle-btn"></label>
+              </div>
+            </div>
+
+            <!-- EXIF Details Form (expandable) -->
+            <div id="exif-details-form" class="exif-form hidden">
+              
+              <!-- Camera Model dropdown -->
+              <div class="control-group">
+                <label for="select-camera-preset">Camera Model Preset</label>
+                <select id="select-camera-preset" class="form-control">
+                  <option value="iphone14">Apple iPhone 14 Pro (USA Standard)</option>
+                  <option value="iphone13">Apple iPhone 13 Pro</option>
+                  <option value="iphone15">Apple iPhone 15 Pro Max</option>
+                  <option value="samsung23">Samsung Galaxy S23 Ultra</option>
+                  <option value="samsung24">Samsung Galaxy S24 Ultra</option>
+                  <option value="pixel8">Google Pixel 8 Pro</option>
+                  <option value="canonr6">Canon EOS R6 Mark II</option>
+                  <option value="sony7">Sony Alpha 7 IV</option>
+                  <option value="custom">Custom Camera Model...</option>
+                </select>
+              </div>
+
+              <!-- Custom Camera input -->
+              <div id="custom-camera-inputs" class="size-inputs-row hidden">
+                <div class="form-input-col">
+                  <label for="input-camera-make">Make</label>
+                  <input type="text" id="input-camera-make" class="form-control" placeholder="Apple">
+                </div>
+                <div class="form-input-col">
+                  <label for="input-camera-model">Model</label>
+                  <input type="text" id="input-camera-model" class="form-control" placeholder="iPhone 14 Pro">
+                </div>
+              </div>
+
+              <!-- GPS Presets -->
+              <div class="control-group">
+                <label for="select-gps-preset">GPS Location Preset</label>
+                <select id="select-gps-preset" class="form-control">
+                  <option value="none">No GPS Location (Cleanest)</option>
+                  <option value="nyc">New York City, NY</option>
+                  <option value="la">Los Angeles, CA</option>
+                  <option value="chicago">Chicago, IL</option>
+                  <option value="houston">Houston, TX</option>
+                  <option value="miami">Miami, FL</option>
+                  <option value="sf">San Francisco, CA</option>
+                  <option value="custom">Custom Coordinates...</option>
+                </select>
+              </div>
+
+              <!-- Custom GPS inputs -->
+              <div id="custom-gps-inputs" class="size-inputs-row hidden">
+                <div class="form-input-col">
+                  <label for="input-gps-lat">Latitude</label>
+                  <input type="number" id="input-gps-lat" class="form-control" placeholder="40.7128" step="0.0001">
+                </div>
+                <div class="form-input-col">
+                  <label for="input-gps-lng">Longitude</label>
+                  <input type="number" id="input-gps-lng" class="form-control" placeholder="-74.0060" step="0.0001">
+                </div>
+              </div>
+
+              <!-- Date Preset -->
+              <div class="control-group">
+                <label for="select-date-preset">Creation DateTime</label>
+                <select id="select-date-preset" class="form-control">
+                  <option value="current">Current System Time</option>
+                  <option value="rand7">Randomized (Last 7 Days)</option>
+                  <option value="rand30">Randomized (Last 30 Days)</option>
+                  <option value="manual">Specific Date/Time...</option>
+                </select>
+              </div>
+
+              <!-- Manual Date input -->
+              <div id="custom-date-input" class="control-group hidden">
+                <label for="input-creation-date">Choose Date &amp; Time</label>
+                <input type="datetime-local" id="input-creation-date" class="form-control">
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 4: ANTI-DUPLICATION / HASH BYPASS -->
+        <div class="settings-card collapsed-header" data-section="security">
+          <div class="card-header">
+            <h3><i class="fa-solid fa-shield-halved slider-icon"></i> Security &amp; Anti-Spam</h3>
+            <i class="fa-solid fa-chevron-down toggle-icon"></i>
+          </div>
+          <div class="card-content">
+            <!-- Micro tweaks -->
+            <div class="toggle-row">
+              <div>
+                <span class="toggle-title">Unique Visual Micro-Tweaks</span>
+                <p class="toggle-desc">Adds tiny human-invisible alterations to contrast, brightness (+/- 0.5%) and dimensions to bypass Google's image perceptual hash scanners.</p>
+              </div>
+              <div class="toggle-switch">
+                <input type="checkbox" id="chk-micro-tweaks" checked>
+                <label for="chk-micro-tweaks" class="slider-toggle-btn"></label>
+              </div>
+            </div>
+
+            <!-- Bulk Auto-Crop -->
+            <div class="control-group mt-3 border-top pt-3">
+              <label for="select-bulk-crop">Auto-Crop Edge Trimming (Bulk &amp; Anti-Spam)</label>
+              <select id="select-bulk-crop" class="form-control">
+                <option value="none">No Auto-Crop</option>
+                <option value="uniform1" selected>Trim 1% from all edges (Recommended)</option>
+                <option value="uniform2">Trim 2% from all edges</option>
+                <option value="random">Randomized Edge Trim (0.5% - 1.5%)</option>
+              </select>
+            </div>
+
+            <!-- Filename pattern -->
+            <div class="control-group mt-3 border-top pt-3">
+              <label for="select-filename-format">Filename Naming Scheme</label>
+              <select id="select-filename-format" class="form-control">
+                <option value="iphone">iPhone Format (e.g. IMG_3849.jpg)</option>
+                <option value="android">Android Format (e.g. 20260604_123456.jpg)</option>
+                <option value="sony">Sony DSC Format (e.g. DSC_8492.jpg)</option>
+                <option value="original">Keep Original Name + prefix</option>
+                <option value="custom">Custom Prefix + Random Serial</option>
+              </select>
+            </div>
+
+            <!-- Custom prefix input -->
+            <div id="custom-filename-prefix" class="control-group hidden">
+              <label for="input-filename-prefix">Custom Prefix</label>
+              <input type="text" id="input-filename-prefix" class="form-control" value="anon_" placeholder="e.g. travel_">
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 5: EXPORT ZONE -->
+        <div class="export-card">
+          <h3>Export Dashboard</h3>
+          
+          <div class="control-group">
+            <label for="select-export-format">Export Format</label>
+            <select id="select-export-format" class="form-control">
+              <option value="jpeg">JPEG (.jpg) - Supports EXIF spoofing</option>
+              <option value="png">PNG (.png) - EXIF stripped completely</option>
+              <option value="webp">WebP (.webp) - EXIF stripped completely</option>
+            </select>
+          </div>
+
+          <div class="control-group" id="quality-slider-group">
+            <div class="control-label">
+              <span>Output Quality</span>
+              <span id="val-quality">90%</span>
+            </div>
+            <input type="range" id="slider-quality" min="10" max="100" value="90">
+          </div>
+
+          <div class="progress-container hidden" id="export-progress-wrapper">
+            <div class="progress-label">
+              <span id="export-progress-text">Processing image 1 of 5...</span>
+              <span id="export-progress-pct">20%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="export-progress-fill" style="width: 20%;"></div>
+            </div>
+          </div>
+
+          <button id="btn-export" class="btn btn-primary btn-large btn-glow mt-3" disabled>
+            <i class="fa-solid fa-download"></i> Process &amp; Save Image
+          </button>
+        </div>
+
+      </aside>
+    </main>
+
+    <!-- Bottom Status Bar -->
+    <footer class="app-status-bar">
+      <div class="status-indicator">
+        <span class="status-dot green"></span>
+        <span id="status-message">SMBify Engine Ready</span>
+      </div>
+      <div id="status-details" class="status-details">
+        <span>No image loaded</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Script source -->
+  <script src="script.js"></script>
+</body>
+</html>
