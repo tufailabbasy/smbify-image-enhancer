@@ -394,9 +394,8 @@ function processSingleFile(file) {
       state.single.history = [];
       state.single.historyIndex = -1;
       
-      // Render to main display
-      const preview = document.getElementById('preview-image');
-      preview.src = event.target.result;
+      // Render optimized display preview to DOM (prevents browser reflow/repaint lag)
+      updateDOMPreview(img);
       
       document.getElementById('single-upload-prompt').classList.add('hidden');
       document.getElementById('image-container').classList.remove('hidden');
@@ -703,8 +702,8 @@ function setupToolbar() {
       state.single.currentWidth = croppedImg.width;
       state.single.currentHeight = croppedImg.height;
       
-      // Update preview image src
-      preview.src = canvas.toDataURL();
+      // Update preview image src with downscaled version to prevent paint lag
+      updateDOMPreview(croppedImg);
       
       disableCropper();
       
@@ -1138,8 +1137,9 @@ function setupUndoRedo() {
 function saveHistoryState() {
   if (state.mode !== 'single') return;
   
-  // Clone image data/state
+  // Clone image data/state (preserving image reference for crop undo)
   const currentState = {
+    img: state.single.img,
     rotation: state.single.rotation,
     flipH: state.single.flipH,
     flipV: state.single.flipV,
@@ -1161,9 +1161,19 @@ function restoreHistoryState() {
   const hState = state.single.history[state.single.historyIndex];
   if (!hState) return;
 
+  // Restore image reference and dimensions
+  state.single.img = hState.img;
+  state.single.originalWidth = hState.img.width;
+  state.single.originalHeight = hState.img.height;
+  state.single.currentWidth = hState.img.width;
+  state.single.currentHeight = hState.img.height;
+
   state.single.rotation = hState.rotation;
   state.single.flipH = hState.flipH;
   state.single.flipV = hState.flipV;
+
+  // Update DOM preview element to display the corrected/restored image
+  updateDOMPreview(hState.img);
 
   applyTransforms();
   updateUndoRedoButtons();
@@ -1833,4 +1843,34 @@ function loadImageObject(src) {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Generate an optimized downscaled preview to load in DOM (prevents browser reflow & paint lag)
+function updateDOMPreview(img) {
+  const preview = document.getElementById('preview-image');
+  if (!preview) return;
+
+  const maxPreviewDim = 1200;
+  let pw = img.naturalWidth || img.width;
+  let ph = img.naturalHeight || img.height;
+  
+  if (pw > ph) {
+    if (pw > maxPreviewDim) {
+      ph = Math.round((ph * maxPreviewDim) / pw);
+      pw = maxPreviewDim;
+    }
+  } else {
+    if (ph > maxPreviewDim) {
+      pw = Math.round((pw * maxPreviewDim) / ph);
+      ph = maxPreviewDim;
+    }
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = pw;
+  canvas.height = ph;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, pw, ph);
+
+  preview.src = canvas.toDataURL('image/jpeg', 0.85);
 }
