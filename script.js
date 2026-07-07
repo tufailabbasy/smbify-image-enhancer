@@ -435,13 +435,43 @@ function processBulkFiles(fileList) {
       imgSrc: null
     };
 
-    // Load preview thumbnail
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      item.imgSrc = e.target.result;
+    // Load preview thumbnail using temporary object URL
+    const tempUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 120;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
+      if (w > h) {
+        if (w > maxDim) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        }
+      } else {
+        if (h > maxDim) {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      item.imgSrc = canvas.toDataURL('image/jpeg', 0.7); // Tiny compressed JPEG
       renderBulkQueue();
+
+      // Revoke the object URL to release the memory
+      URL.revokeObjectURL(tempUrl);
     };
-    reader.readAsDataURL(file);
+
+    img.onerror = () => {
+      URL.revokeObjectURL(tempUrl);
+    };
+
+    img.src = tempUrl;
 
     state.bulk.queue.push(item);
   });
@@ -1658,9 +1688,15 @@ async function exportBulkImages() {
     // Await minor tick to allow DOM rendering thread updates
     await sleep(60);
 
+    let tempUrl = null;
     try {
-      // Load source image object
-      const img = await loadImageObject(item.imgSrc);
+      // Load source image object from raw file using temporary object URL
+      tempUrl = URL.createObjectURL(item.file);
+      const img = await loadImageObject(tempUrl);
+      
+      // Revoke the object URL immediately to release resource pointer
+      URL.revokeObjectURL(tempUrl);
+      tempUrl = null;
 
       // Render to canvas applying visual filters & size adjustments
       const canvas = processImageToCanvas(img, currentFilters, transforms, sizeSettings, { enabled: microTweaksEnabled });
@@ -1690,6 +1726,9 @@ async function exportBulkImages() {
 
       item.status = 'success';
     } catch(err) {
+      if (tempUrl) {
+        URL.revokeObjectURL(tempUrl);
+      }
       console.error("Failed to process queue image: " + item.name, err);
       item.status = 'pending'; // Reset state
     }
