@@ -437,6 +437,14 @@ function processSingleFile(file) {
 function processBulkFiles(fileList) {
   const isFirstBatch = state.bulk.queue.length === 0;
   const chkPreviews = document.getElementById('chk-show-previews');
+  
+  // Auto-disable previews if batch is larger than 30 files to prevent main thread lockup
+  if (state.bulk.queue.length + fileList.length > 30) {
+    if (chkPreviews) {
+      chkPreviews.checked = false;
+    }
+  }
+  
   const showPreviews = chkPreviews ? chkPreviews.checked : true;
 
   Array.from(fileList).forEach(file => {
