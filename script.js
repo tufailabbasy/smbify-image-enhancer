@@ -418,7 +418,10 @@ function processSingleFile(file) {
 }
 
 // BULK IMAGES QUEUE WORKFLOW
+// BULK IMAGES QUEUE WORKFLOW
 function processBulkFiles(fileList) {
+  const isFirstBatch = state.bulk.queue.length === 0;
+
   Array.from(fileList).forEach(file => {
     // Check if duplicate in queue
     if (state.bulk.queue.some(item => item.file.name === file.name && item.file.size === file.size)) {
@@ -434,7 +437,11 @@ function processBulkFiles(fileList) {
       imgSrc: null
     };
 
-    // Load preview thumbnail using temporary object URL
+    // Append card to DOM immediately (no rebuilding of other cards!)
+    appendBulkCardToDOM(item);
+    state.bulk.queue.push(item);
+
+    // Load preview thumbnail asynchronously using temporary object URL
     const tempUrl = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -460,7 +467,9 @@ function processBulkFiles(fileList) {
       ctx.drawImage(img, 0, 0, w, h);
 
       item.imgSrc = canvas.toDataURL('image/jpeg', 0.7); // Tiny compressed JPEG
-      renderBulkQueue();
+      
+      // Update only this specific card's thumbnail and status in the DOM
+      updateBulkCardInDOM(item);
 
       // Revoke the object URL to release the memory
       URL.revokeObjectURL(tempUrl);
@@ -471,48 +480,87 @@ function processBulkFiles(fileList) {
     };
 
     img.src = tempUrl;
-
-    state.bulk.queue.push(item);
   });
 
-  document.getElementById('bulk-upload-zone').classList.add('hidden');
-  document.getElementById('bulk-queue-container').classList.remove('hidden');
-  
+  if (isFirstBatch && state.bulk.queue.length > 0) {
+    document.getElementById('bulk-upload-zone').classList.add('hidden');
+    document.getElementById('bulk-queue-container').classList.remove('hidden');
+  }
+
+  document.getElementById('bulk-queue-count').textContent = state.bulk.queue.length;
   toggleExportButtonState();
   updateStatusDetails();
   logStatus(`Queued ${state.bulk.queue.length} images`);
 }
 
-// RENDER BULK GRID
+// APPEND A SINGLE CARD TO BULK GRID (INCREMENTAL DOM UPDATE)
+function appendBulkCardToDOM(item) {
+  const grid = document.getElementById('bulk-image-grid');
+  if (!grid) return;
+
+  const card = document.createElement('div');
+  card.className = 'bulk-card';
+  card.setAttribute('data-id', item.id);
+  card.innerHTML = `
+    <button class="card-delete" onclick="removeBulkItem('${item.id}')"><i class="fa-solid fa-xmark"></i></button>
+    <div class="thumb-wrap">
+      <i class="fa-regular fa-image" style="font-size: 28px; color: var(--text-secondary);"></i>
+    </div>
+    <div class="card-info">
+      <span class="img-name" title="${item.name}">${item.name}</span>
+      <span class="img-size">${item.sizeText}</span>
+    </div>
+    <span class="card-badge ${item.status}">${item.status}</span>
+  `;
+  grid.appendChild(card);
+}
+
+// UPDATE A SINGLE CARD IN DOM (TARGETED DOM UPDATE)
+function updateBulkCardInDOM(item) {
+  const card = document.querySelector(`.bulk-card[data-id="${item.id}"]`);
+  if (!card) return;
+
+  // Update thumbnail if loaded
+  const thumbWrap = card.querySelector('.thumb-wrap');
+  if (thumbWrap && item.imgSrc) {
+    thumbWrap.innerHTML = `<img src="${item.imgSrc}">`;
+  }
+
+  // Update status badge
+  const badge = card.querySelector('.card-badge');
+  if (badge) {
+    badge.className = `card-badge ${item.status}`;
+    badge.textContent = item.status;
+  }
+}
+
+// RENDER BULK GRID (FULL REBUILD - ONLY USED WHEN REDRAWING ENTIRE QUEUE)
 function renderBulkQueue() {
   const grid = document.getElementById('bulk-image-grid');
+  if (!grid) return;
   grid.innerHTML = '';
   
   state.bulk.queue.forEach(item => {
-    const card = document.createElement('div');
-    card.className = 'bulk-card';
-    card.innerHTML = `
-      <button class="card-delete" onclick="removeBulkItem('${item.id}')"><i class="fa-solid fa-xmark"></i></button>
-      <div class="thumb-wrap">
-        ${item.imgSrc ? `<img src="${item.imgSrc}">` : `<i class="fa-regular fa-image" style="font-size: 28px; color: var(--text-secondary);"></i>`}
-      </div>
-      <div class="card-info">
-        <span class="img-name" title="${item.name}">${item.name}</span>
-        <span class="img-size">${item.sizeText}</span>
-      </div>
-      <span class="card-badge ${item.status}">${item.status}</span>
-    `;
-    grid.appendChild(card);
+    appendBulkCardToDOM(item);
+    if (item.imgSrc) {
+      updateBulkCardInDOM(item);
+    }
   });
 
   document.getElementById('bulk-queue-count').textContent = state.bulk.queue.length;
 }
 
-// REMOVE ITEM FROM BULK
+// REMOVE ITEM FROM BULK (TARGETED DOM REMOVAL)
 window.removeBulkItem = function(id) {
   state.bulk.queue = state.bulk.queue.filter(item => item.id !== id);
-  renderBulkQueue();
   
+  const card = document.querySelector(`.bulk-card[data-id="${id}"]`);
+  if (card) {
+    card.remove();
+  }
+  
+  document.getElementById('bulk-queue-count').textContent = state.bulk.queue.length;
+
   if (state.bulk.queue.length === 0) {
     document.getElementById('bulk-upload-zone').classList.remove('hidden');
     document.getElementById('bulk-queue-container').classList.add('hidden');
@@ -526,6 +574,9 @@ window.removeBulkItem = function(id) {
 // CLEAR ALL BULK QUEUE
 document.getElementById('btn-clear-queue').addEventListener('click', () => {
   state.bulk.queue = [];
+  const grid = document.getElementById('bulk-image-grid');
+  if (grid) grid.innerHTML = '';
+  
   document.getElementById('bulk-upload-zone').classList.remove('hidden');
   document.getElementById('bulk-queue-container').classList.add('hidden');
   toggleExportButtonState();
@@ -1687,7 +1738,7 @@ async function exportBulkImages() {
   for (let i = 0; i < total; i++) {
     const item = queue[i];
     item.status = 'processing';
-    renderBulkQueue();
+    updateBulkCardInDOM(item);
     
     // Update progress HTML
     const percentage = Math.round((i / total) * 100);
@@ -1735,12 +1786,14 @@ async function exportBulkImages() {
       zip.file(outputFilename, blob);
 
       item.status = 'success';
+      updateBulkCardInDOM(item);
     } catch(err) {
       if (tempUrl) {
         URL.revokeObjectURL(tempUrl);
       }
       console.error("Failed to process queue image: " + item.name, err);
       item.status = 'pending'; // Reset state
+      updateBulkCardInDOM(item);
     }
   }
 
