@@ -136,10 +136,16 @@
           
           <!-- Bulk Image List Grid -->
           <div id="bulk-queue-container" class="bulk-queue-container hidden">
-            <div class="queue-header">
-              <h3>Image Queue (<span id="bulk-queue-count">0</span> files loaded)</h3>
-              <button id="btn-clear-queue" class="btn-clear"><i class="fa-solid fa-circle-xmark"></i> Clear Queue</button>
-            </div>
+             <div class="queue-header">
+               <h3>Image Queue (<span id="bulk-queue-count">0</span> files loaded)</h3>
+               <div class="queue-header-actions" style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                 <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                   <input type="checkbox" id="chk-show-previews" checked style="cursor: pointer; width: 14px; height: 14px; margin: 0;">
+                   Show Preview Grid (Turn off for fast bulk)
+                 </label>
+                 <button id="btn-clear-queue" class="btn-clear"><i class="fa-solid fa-circle-xmark"></i> Clear Queue</button>
+               </div>
+             </div>
             <div id="bulk-image-grid" class="bulk-image-grid">
               <!-- Dynamically populated card thumbnails -->
             </div>

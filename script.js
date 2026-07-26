@@ -370,6 +370,21 @@ function setupFileUpload() {
       }
     }
   });
+
+  // Handle bulk preview grid toggle
+  const chkPreviews = document.getElementById('chk-show-previews');
+  const grid = document.getElementById('bulk-image-grid');
+  if (chkPreviews && grid) {
+    chkPreviews.addEventListener('change', () => {
+      if (chkPreviews.checked) {
+        grid.classList.remove('hidden');
+        renderBulkQueue();
+      } else {
+        grid.classList.add('hidden');
+        grid.innerHTML = ''; // Clear DOM to release memory immediately
+      }
+    });
+  }
 }
 
 // SINGLE IMAGE WORKFLOW
@@ -421,6 +436,8 @@ function processSingleFile(file) {
 // BULK IMAGES QUEUE WORKFLOW
 function processBulkFiles(fileList) {
   const isFirstBatch = state.bulk.queue.length === 0;
+  const chkPreviews = document.getElementById('chk-show-previews');
+  const showPreviews = chkPreviews ? chkPreviews.checked : true;
 
   Array.from(fileList).forEach(file => {
     // Check if duplicate in queue
@@ -437,54 +454,69 @@ function processBulkFiles(fileList) {
       imgSrc: null
     };
 
-    // Append card to DOM immediately (no rebuilding of other cards!)
-    appendBulkCardToDOM(item);
     state.bulk.queue.push(item);
 
-    // Load preview thumbnail asynchronously using temporary object URL
-    const tempUrl = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const maxDim = 120;
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      if (w > h) {
-        if (w > maxDim) {
-          h = Math.round((h * maxDim) / w);
-          w = maxDim;
+    // Only render and generate thumbnails if preview grid is enabled
+    if (showPreviews) {
+      // Append card to DOM immediately (no rebuilding of other cards!)
+      appendBulkCardToDOM(item);
+
+      // Load preview thumbnail asynchronously using temporary object URL
+      const tempUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const maxDim = 120;
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        if (w > h) {
+          if (w > maxDim) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          }
+        } else {
+          if (h > maxDim) {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
         }
-      } else {
-        if (h > maxDim) {
-          w = Math.round((w * maxDim) / h);
-          h = maxDim;
-        }
-      }
 
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
 
-      item.imgSrc = canvas.toDataURL('image/jpeg', 0.7); // Tiny compressed JPEG
-      
-      // Update only this specific card's thumbnail and status in the DOM
-      updateBulkCardInDOM(item);
+        item.imgSrc = canvas.toDataURL('image/jpeg', 0.7); // Tiny compressed JPEG
+        
+        // Update only this specific card's thumbnail and status in the DOM
+        updateBulkCardInDOM(item);
 
-      // Revoke the object URL to release the memory
-      URL.revokeObjectURL(tempUrl);
-    };
+        // Revoke the object URL to release the memory
+        URL.revokeObjectURL(tempUrl);
+      };
 
-    img.onerror = () => {
-      URL.revokeObjectURL(tempUrl);
-    };
+      img.onerror = () => {
+        URL.revokeObjectURL(tempUrl);
+      };
 
-    img.src = tempUrl;
+      img.src = tempUrl;
+    }
   });
 
   if (isFirstBatch && state.bulk.queue.length > 0) {
     document.getElementById('bulk-upload-zone').classList.add('hidden');
     document.getElementById('bulk-queue-container').classList.remove('hidden');
+  }
+
+  // Sync grid visibility state
+  const grid = document.getElementById('bulk-image-grid');
+  if (grid) {
+    if (showPreviews) {
+      grid.classList.remove('hidden');
+    } else {
+      grid.classList.add('hidden');
+      grid.innerHTML = '';
+    }
   }
 
   document.getElementById('bulk-queue-count').textContent = state.bulk.queue.length;
