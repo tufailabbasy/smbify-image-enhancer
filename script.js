@@ -1147,9 +1147,16 @@ function setupEXIFControls() {
       cameraCustom.classList.remove('hidden');
     } else {
       cameraCustom.classList.add('hidden');
-      const p = CAMERA_PRESETS[val];
-      makeIn.value = p.make;
-      modelIn.value = p.model;
+      if (val !== 'none') {
+        const p = CAMERA_PRESETS[val];
+        if (p) {
+          makeIn.value = p.make;
+          modelIn.value = p.model;
+        }
+      } else {
+        makeIn.value = '';
+        modelIn.value = '';
+      }
     }
   });
 
