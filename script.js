@@ -1460,6 +1460,17 @@ function processImageToCanvas(imgElement, filters, transforms, sizeSettings, mic
   ctx.drawImage(imgElement, sx, sy, sw, sh, -renderW / 2, -renderH / 2, renderW, renderH);
   ctx.restore();
 
+  // Apply invisible pixel noise pattern to disrupt steganographic AI watermarks (SynthID / Adobe / etc.)
+  const aiCleanerSelect = document.getElementById('chk-ai-cleaner');
+  if (aiCleanerSelect && aiCleanerSelect.checked) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.globalAlpha = 0.025; // 2.5% opacity - completely human-invisible
+    ctx.fillStyle = getNoisePattern();
+    ctx.fillRect(0, 0, targetW, targetH);
+    ctx.restore();
+  }
+
   // Apply manual sharpening if requested (runs post-draw convolution filter)
   if (filters.sharpness > 0) {
     const imgData = ctx.getImageData(0, 0, targetW, targetH);
@@ -1973,4 +1984,31 @@ function updateDOMPreview(img) {
   ctx.drawImage(img, 0, 0, pw, ph);
 
   preview.src = canvas.toDataURL('image/jpeg', 0.85);
+}
+
+// Steganographic noise pattern generator to disrupt SynthID and other invisible watermarks
+let noisePattern = null;
+function getNoisePattern() {
+  if (noisePattern) return noisePattern;
+
+  const noiseCanvas = document.createElement('canvas');
+  noiseCanvas.width = 128;
+  noiseCanvas.height = 128;
+  const nCtx = noiseCanvas.getContext('2d');
+  const nData = nCtx.createImageData(128, 128);
+  const data = nData.data;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const val = Math.floor(Math.random() * 256);
+    data[i] = val;     // R
+    data[i+1] = val;   // G
+    data[i+2] = val;   // B
+    data[i+3] = 255;   // A
+  }
+  nCtx.putImageData(nData, 0, 0);
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  noisePattern = ctx.createPattern(noiseCanvas, 'repeat');
+  return noisePattern;
 }
